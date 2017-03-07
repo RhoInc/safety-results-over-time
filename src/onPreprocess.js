@@ -8,14 +8,23 @@ export default function onPreprocess() {
 
   //Filter data and nest data by visit and group.
     this.measure_data = this.raw_data
-        .filter(d => d[this.config.measure_col] === measure);
+        .filter(d =>
+            d[this.config.measure_col] === measure &&
+            !(this.config.y.type === 'log' && +d[this.config.value_col] <= 0));
+
+  //Note whether zero results were removed to accomodate a logged axis.
+    if (this.measure_data.length !== this.raw_data.filter(d => d[this.config.measure_col] === measure).length)
+        d3.select(this.wrap.node().parentNode).select('#log-note').style('display', 'inline');
+    else
+        d3.select(this.wrap.node().parentNode).select('#log-note').style('display', 'none');
+
+  //Define y-axis range based on currently selected measure.
     const nested_data = d3.nest()
         .key(d => d[this.config.x.column])
         .key(d => d[this.config.color_by])
         .rollup(d => d.map(m => +m[this.config.y.column]))
         .entries(this.measure_data);
 
-  //Define y-axis range based on currently selected measure.
     if (!this.config.violins) {
         const y_05s = [];
         const y_95s = [];

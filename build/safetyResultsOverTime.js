@@ -210,6 +210,9 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
     function onLayout() {
         //Add population count container.
         this.controls.wrap.append('div').attr('id', 'populationCount').style('font-style', 'italic');
+
+        //Add logged y-axis footnote.
+        d3.select(this.wrap.node().parentNode).append('em').attr('id', 'log-note').text('Values of zero have been removed to prevent issues with the logged y-axis.').style('display', 'none');
     }
 
     function onPreprocess() {
@@ -222,8 +225,15 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
 
         //Filter data and nest data by visit and group.
         this.measure_data = this.raw_data.filter(function (d) {
-            return d[_this.config.measure_col] === measure;
+            return d[_this.config.measure_col] === measure && !(_this.config.y.type === 'log' && +d[_this.config.value_col] <= 0);
         });
+
+        //Note whether zero results were removed to accomodate a logged axis.
+        if (this.measure_data.length !== this.raw_data.filter(function (d) {
+            return d[_this.config.measure_col] === measure;
+        }).length) d3.select(this.wrap.node().parentNode).select('#log-note').style('display', 'inline');else d3.select(this.wrap.node().parentNode).select('#log-note').style('display', 'none');
+
+        //Define y-axis range based on currently selected measure.
         var nested_data = d3.nest().key(function (d) {
             return d[_this.config.x.column];
         }).key(function (d) {
@@ -234,7 +244,6 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
             });
         }).entries(this.measure_data);
 
-        //Define y-axis range based on currently selected measure.
         if (!this.config.violins) {
             (function () {
                 var y_05s = [];
@@ -256,6 +265,7 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
     function onDataTransform() {
         //Redefine y-axis label.
         this.config.y.label = this.measure_data[0][this.config.measure_col] + ' (' + this.measure_data[0][this.config.unit_col] + ')';
+
         //Redefine legend label.
         var group_value_cols = this.config.groups.map(function (group) {
             return group.value_col ? group.value_col : group;
@@ -300,17 +310,6 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
             });
         });
 
-        //Nest filtered data.
-        this.nested_data = d3.nest().key(function (d) {
-            return d[_this.config.x.column];
-        }).key(function (d) {
-            return d[_this.config.color_by];
-        }).rollup(function (d) {
-            return d.map(function (m) {
-                return +m[_this.config.y.column];
-            });
-        }).entries(this.filtered_data);
-
         //Clear y-axis ticks.
         this.svg.selectAll('.y .tick').remove();
 
@@ -318,12 +317,12 @@ var safetyResultsOverTime = function (webcharts, d3$1) {
         this.nested_data = d3$1.nest().key(function (d) {
             return d[_this.config.x.column];
         }).key(function (d) {
-            return d[_this.config.marks[0].per[0]];
+            return d[_this.config.color_by];
         }).rollup(function (d) {
             return d.map(function (m) {
                 return +m[_this.config.y.column];
             });
-        }).entries(this.filtered_data);
+        }).entries(this.measure_data);
 
         //Annotate population count.
         updateSubjectCount(this, '#populationCount');
